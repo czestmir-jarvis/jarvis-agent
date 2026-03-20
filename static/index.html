@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jarvis">
+<title>Jarvis</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:#060a10;color:#b0e0ff;font-family:'Outfit',sans-serif;height:100dvh;overflow:hidden;display:flex;flex-direction:column;align-items:center}
+.top{padding:10px 20px;padding-top:max(10px,env(safe-area-inset-top));width:100%;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.status{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:rgba(0,180,255,0.4);display:flex;align-items:center;gap:8px}
+.sdot{width:8px;height:8px;border-radius:50%;transition:all .3s}
+.sdot.on{background:#00d4ff;box-shadow:0 0 10px rgba(0,210,255,0.6)}.sdot.off{background:#334}.sdot.chk{background:#f59e0b;animation:pls 1.5s infinite}
+.gear{padding:8px;border-radius:8px;border:1px solid rgba(0,180,255,0.08);background:0;color:rgba(0,180,255,0.3);cursor:pointer}
+
+.main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;padding:0 20px;gap:20px;position:relative}
+
+/* Arc Reactor */
+.reactor-wrap{position:relative;width:260px;height:260px;cursor:pointer}
+.reactor{width:100%;height:100%;transition:filter .3s}
+.reactor.active{filter:drop-shadow(0 0 40px rgba(0,180,255,0.5))}
+.reactor.speaking{filter:drop-shadow(0 0 60px rgba(0,180,255,0.7))}
+.reactor.listening{filter:drop-shadow(0 0 50px rgba(0,220,255,0.6))}
+
+/* State text */
+.state{text-align:center}
+.state-label{font-size:13px;font-weight:300;color:rgba(0,180,255,0.4);letter-spacing:4px;text-transform:uppercase;margin-bottom:6px}
+.state-text{font-size:18px;font-weight:600;color:#c0e4ff;min-height:28px}
+.state-sub{font-size:13px;color:rgba(0,180,255,0.25);margin-top:8px}
+
+/* Response text (scrollable, below reactor) */
+.response{width:100%;max-height:180px;overflow-y:auto;text-align:center;padding:0 10px;-webkit-overflow-scrolling:touch}
+.response p{font-size:15px;line-height:1.6;color:rgba(200,230,255,0.85);animation:fu .4s ease-out}
+
+/* Bottom bar */
+.bottom{padding:16px 20px;padding-bottom:max(16px,env(safe-area-inset-bottom));width:100%;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:12px}
+.hint{font-size:12px;color:rgba(0,180,255,0.2);letter-spacing:1px}
+.controls{display:flex;gap:12px;align-items:center}
+.mic-btn{width:64px;height:64px;border-radius:50%;border:2px solid rgba(0,180,255,0.2);background:rgba(0,180,255,0.05);color:rgba(0,180,255,0.5);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s}
+.mic-btn.active{border-color:#00d4ff;background:rgba(0,180,255,0.2);color:#00d4ff;animation:pm 1.2s ease-in-out infinite}
+.mic-btn.disabled{opacity:0.3;pointer-events:none}
+.stop-btn{width:48px;height:48px;border-radius:50%;border:1.5px solid rgba(255,100,100,0.3);background:rgba(255,60,60,0.08);color:#ff6b6b;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.text-toggle{width:48px;height:48px;border-radius:50%;border:1.5px solid rgba(0,180,255,0.12);background:rgba(0,180,255,0.03);color:rgba(0,180,255,0.3);display:flex;align-items:center;justify-content:center;cursor:pointer}
+
+/* Text input (hidden by default, toggled) */
+.text-input-wrap{width:100%;max-width:400px;display:flex;gap:8px}
+.text-input-wrap.hid{display:none}
+.tinp{flex:1;padding:12px 16px;border-radius:24px;border:1px solid rgba(0,180,255,0.12);background:rgba(0,180,255,0.04);color:#b0e0ff;font-size:15px;outline:0;font-family:inherit}
+.tinp::placeholder{color:rgba(0,180,255,0.2)}
+.tsnd{width:44px;height:44px;border-radius:50%;border:0;background:linear-gradient(135deg,rgba(0,140,220,0.4),rgba(0,100,200,0.2));color:#00d4ff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+
+/* Settings */
+.ov{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.7);backdrop-filter:blur(12px);display:flex;align-items:flex-end;justify-content:center}
+.sp{width:100%;max-width:480px;background:#0d1520;border-radius:24px 24px 0 0;padding:24px 20px 40px;border:1px solid rgba(0,180,255,0.1);border-bottom:0}
+.sh{width:36px;height:4px;background:rgba(0,180,255,0.2);border-radius:2px;margin:0 auto 20px}
+.stitle{font-size:20px;font-weight:700;color:#b0e0ff;margin-bottom:20px}
+.slbl{font-size:11px;font-weight:700;color:rgba(0,180,255,0.5);letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:8px}
+.srow{display:flex;gap:8px;margin-bottom:20px}
+.sinp{flex:1;padding:12px;border-radius:12px;border:1px solid rgba(0,180,255,0.15);background:rgba(0,180,255,0.05);color:#b0e0ff;font-size:14px;outline:0;font-family:monospace}
+.sbtn{padding:12px 20px;border-radius:12px;border:1px solid rgba(0,180,255,0.3);background:rgba(0,180,255,0.1);color:#00b4ff;font-weight:700;cursor:pointer;font-size:14px}
+.vtgl{width:100%;padding:14px 16px;border-radius:14px;border:1.5px solid rgba(0,180,255,0.1);background:0;cursor:pointer;display:flex;align-items:center;justify-content:space-between;font-family:inherit;margin-bottom:12px}
+.vtgl.on{border-color:rgba(0,180,255,0.4);background:rgba(0,180,255,0.1)}
+.vtgl span{font-size:15px;color:#b0e0ff;font-weight:600}
+.tk{width:48px;height:28px;border-radius:14px;padding:3px;display:flex;transition:all .2s}
+.tk.on{background:rgba(0,180,255,0.4);justify-content:flex-end}.tk.off{background:rgba(255,255,255,0.1);justify-content:flex-start}
+.tm{width:22px;height:22px;border-radius:11px;transition:all .2s}
+.tk.on .tm{background:#00d4ff}.tk.off .tm{background:#445}
+.hid{display:none!important}
+
+@keyframes fu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pls{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes pm{0%,100%{box-shadow:0 0 0 0 rgba(0,180,255,0.4)}50%{box-shadow:0 0 0 16px rgba(0,180,255,0)}}
+@keyframes ro{to{transform:rotate(360deg)}}
+@keyframes rr{to{transform:rotate(-360deg)}}
+@keyframes pc{0%,100%{opacity:1;r:8}50%{opacity:.5;r:12}}
+@keyframes pcf{0%,100%{opacity:1;r:8}50%{opacity:.6;r:14}}
+@keyframes sh{0%{background-position:-200% 0}100%{background-position:200% 0}}
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="top">
+  <div class="status"><div class="sdot chk" id="dot"></div><span id="stxt">LINKING</span></div>
+  <button class="gear" onclick="tglS()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+</div>
+
+<!-- Main area -->
+<div class="main">
+  <!-- Arc Reactor -->
+  <div class="reactor-wrap" onclick="tapReactor()">
+    <svg class="reactor" id="reactor" viewBox="0 0 260 260">
+      <defs>
+        <radialGradient id="cg"><stop offset="0%" stop-color="#fff" stop-opacity="0.4"/><stop offset="30%" stop-color="#00d4ff" stop-opacity="0.3"/><stop offset="100%" stop-color="transparent"/></radialGradient>
+        <radialGradient id="cga"><stop offset="0%" stop-color="#fff" stop-opacity="0.9"/><stop offset="30%" stop-color="#00d4ff" stop-opacity="0.6"/><stop offset="100%" stop-color="transparent"/></radialGradient>
+      </defs>
+      <!-- Outer ring -->
+      <circle cx="130" cy="130" r="124" fill="none" stroke="rgba(0,100,140,0.15)" stroke-width="1.5" id="r1"/>
+      <circle cx="130" cy="130" r="115" fill="none" stroke="rgba(0,100,140,0.08)" stroke-width="0.5"/>
+      <!-- Rotating ticks -->
+      <g id="ticks" style="transform-origin:130px 130px">
+        <line x1="130" y1="12" x2="130" y2="32" stroke="rgba(0,100,140,0.2)" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="130" y1="12" x2="130" y2="32" stroke="rgba(0,100,140,0.2)" stroke-width="2.5" stroke-linecap="round" transform="rotate(60 130 130)"/>
+        <line x1="130" y1="12" x2="130" y2="32" stroke="rgba(0,100,140,0.2)" stroke-width="2.5" stroke-linecap="round" transform="rotate(120 130 130)"/>
+        <line x1="130" y1="12" x2="130" y2="32" stroke="rgba(0,100,140,0.2)" stroke-width="2.5" stroke-linecap="round" transform="rotate(180 130 130)"/>
+        <line x1="130" y1="12" x2="130" y2="32" stroke="rgba(0,100,140,0.2)" stroke-width="2.5" stroke-linecap="round" transform="rotate(240 130 130)"/>
+        <line x1="130" y1="12" x2="130" y2="32" stroke="rgba(0,100,140,0.2)" stroke-width="2.5" stroke-linecap="round" transform="rotate(300 130 130)"/>
+      </g>
+      <!-- Mid ring -->
+      <circle cx="130" cy="130" r="82" fill="none" stroke="rgba(0,100,140,0.1)" stroke-width="3.5" stroke-dasharray="4 8" id="r2" style="transform-origin:130px 130px"/>
+      <!-- Inner elements -->
+      <g id="inner" style="transform-origin:130px 130px">
+        <rect x="124" y="48" width="12" height="24" rx="4" fill="rgba(0,100,140,0.15)"/>
+        <rect x="124" y="48" width="12" height="24" rx="4" fill="rgba(0,100,140,0.15)" transform="rotate(120 130 130)"/>
+        <rect x="124" y="48" width="12" height="24" rx="4" fill="rgba(0,100,140,0.15)" transform="rotate(240 130 130)"/>
+      </g>
+      <!-- Core -->
+      <circle cx="130" cy="130" r="48" fill="url(#cg)" id="glow"/>
+      <circle cx="130" cy="130" r="30" fill="rgba(0,100,140,0.08)" id="mid"/>
+      <circle cx="130" cy="130" r="10" fill="#1a4a5a" id="core"/>
+    </svg>
+  </div>
+
+  <!-- State display -->
+  <div class="state">
+    <div class="state-label" id="slbl">READY</div>
+    <div class="state-text" id="stxt2"></div>
+    <div class="state-sub" id="ssub">Tap the microphone or the reactor to speak</div>
+  </div>
+
+  <!-- Response text -->
+  <div class="response" id="resp"></div>
+</div>
+
+<!-- Bottom controls -->
+<div class="bottom">
+  <div class="controls">
+    <button class="text-toggle" id="ttgl" onclick="tglTxt()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>
+    <button class="mic-btn" id="mic" onclick="tapMic()"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="1" width="6" height="14" rx="3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
+    <button class="stop-btn hid" id="stopb" onclick="stopAll()"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
+  </div>
+  <div class="text-input-wrap hid" id="txtwrap">
+    <input class="tinp" id="tinp" placeholder="Type a command, sir..." onkeydown="if(event.key==='Enter')sendTxt()">
+    <button class="tsnd" onclick="sendTxt()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="ov hid" id="sov" onclick="tglS()">
+<div class="sp" onclick="event.stopPropagation()">
+  <div class="sh"></div><div class="stitle">Configuration</div>
+  <div class="slbl">Voice Response</div>
+  <button class="vtgl on" id="vtb" onclick="tglV()"><span id="vlb">Jarvis will speak</span><div class="tk on" id="vtk"><div class="tm"></div></div></button>
+  <div class="slbl">Hands-Free Mode</div>
+  <button class="vtgl on" id="hfb" onclick="tglHF()"><span id="hflb">Auto-listen after response</span><div class="tk on" id="hftk"><div class="tm"></div></div></button>
+  <div class="slbl" style="margin-top:8px">About</div>
+  <div style="font-size:13px;color:rgba(0,180,255,0.3);line-height:1.6">Jarvis v2 — Powered by Claude. Tap the reactor or mic to speak. Jarvis remembers your conversations.</div>
+</div></div>
+
+<script>
+// State
+let U=location.origin, VC=true, HF=true, ST="idle"; // idle|listening|processing|speaking
+let REC=null, SPK_U=null;
+
+// Init
+document.addEventListener("DOMContentLoaded",()=>{
+  if(window.speechSynthesis){speechSynthesis.getVoices();speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices()}
+  setGreet();
+  cH();
+});
+
+function setGreet(){
+  let h=new Date().getHours();
+  document.getElementById("stxt2").textContent="Good "+(h<12?"morning":h<18?"afternoon":"evening")+", sir.";
+}
+
+// Health
+async function cH(){
+  try{let r=await fetch(U+"/health");setC(r.ok)}catch{setC(false)}
+}
+function setC(ok){
+  let d=document.getElementById("dot"),t=document.getElementById("stxt");
+  d.className="sdot "+(ok?"on":"off");
+  t.textContent=ok?"ONLINE":"OFFLINE";
+}
+
+// Reactor animation
+function setReactorState(state){
+  ST=state;
+  let r=document.getElementById("reactor");
+  let ticks=document.getElementById("ticks");
+  let r2=document.getElementById("r2");
+  let inner=document.getElementById("inner");
+  let core=document.getElementById("core");
+  let glow=document.getElementById("glow");
+  let mid=document.getElementById("mid");
+  let r1=document.getElementById("r1");
+  let sl=document.getElementById("slbl");
+  let ss=document.getElementById("ssub");
+  let mb=document.getElementById("mic");
+  let stb=document.getElementById("stopb");
+
+  // Reset
+  r.className="reactor";
+  ticks.style.animation="";
+  r2.style.animation="";
+  inner.style.animation="";
+  core.style.animation="";
+  core.setAttribute("fill","#1a4a5a");
+  glow.setAttribute("fill","url(#cg)");
+  mid.setAttribute("fill","rgba(0,100,140,0.08)");
+  r1.setAttribute("stroke","rgba(0,100,140,0.15)");
+  r2.setAttribute("stroke","rgba(0,100,140,0.1)");
+  r2.setAttribute("stroke-dasharray","4 8");
+  ticks.querySelectorAll("line").forEach(l=>l.setAttribute("stroke","rgba(0,100,140,0.2)"));
+  inner.querySelectorAll("rect").forEach(x=>x.setAttribute("fill","rgba(0,100,140,0.15)"));
+  stb.classList.add("hid");
+  mb.classList.remove("active","disabled");
+
+  if(state==="listening"){
+    r.classList.add("listening");
+    ticks.style.animation="ro 6s linear infinite";
+    r2.style.animation="rr 8s linear infinite";
+    r2.setAttribute("stroke","rgba(0,200,255,0.3)");
+    r2.setAttribute("stroke-dasharray","10 6");
+    core.setAttribute("fill","#00d4ff");
+    core.style.animation="pcf .8s ease-in-out infinite";
+    glow.setAttribute("fill","url(#cga)");
+    mid.setAttribute("fill","rgba(0,210,255,0.15)");
+    r1.setAttribute("stroke","rgba(0,180,255,0.3)");
+    ticks.querySelectorAll("line").forEach(l=>l.setAttribute("stroke","rgba(0,200,255,0.5)"));
+    inner.querySelectorAll("rect").forEach(x=>x.setAttribute("fill","rgba(0,200,255,0.4)"));
+    sl.textContent="LISTENING";
+    ss.textContent="";
+    mb.classList.add("active");
+  } else if(state==="processing"){
+    r.classList.add("active");
+    ticks.style.animation="ro 3s linear infinite";
+    r2.style.animation="rr 2s linear infinite";
+    inner.style.animation="ro 10s linear infinite";
+    r2.setAttribute("stroke","rgba(0,180,255,0.25)");
+    core.setAttribute("fill","#00b4ff");
+    core.style.animation="pc 1.5s ease-in-out infinite";
+    glow.setAttribute("fill","url(#cga)");
+    r1.setAttribute("stroke","rgba(0,180,255,0.25)");
+    ticks.querySelectorAll("line").forEach(l=>l.setAttribute("stroke","rgba(0,200,255,0.4)"));
+    inner.querySelectorAll("rect").forEach(x=>x.setAttribute("fill","rgba(0,200,255,0.3)"));
+    sl.textContent="PROCESSING";
+    ss.textContent="";
+    mb.classList.add("disabled");
+  } else if(state==="speaking"){
+    r.classList.add("speaking");
+    ticks.style.animation="ro 10s linear infinite";
+    r2.style.animation="rr 4s linear infinite";
+    r2.setAttribute("stroke","rgba(0,180,255,0.3)");
+    r2.setAttribute("stroke-dasharray","8 12");
+    core.setAttribute("fill","#00d4ff");
+    core.style.animation="pcf .6s ease-in-out infinite";
+    glow.setAttribute("fill","url(#cga)");
+    mid.setAttribute("fill","rgba(0,210,255,0.12)");
+    r1.setAttribute("stroke","rgba(0,180,255,0.3)");
+    ticks.querySelectorAll("line").forEach(l=>l.setAttribute("stroke","rgba(0,200,255,0.5)"));
+    inner.querySelectorAll("rect").forEach(x=>x.setAttribute("fill","rgba(0,200,255,0.35)"));
+    sl.textContent="SPEAKING";
+    ss.textContent="";
+    stb.classList.remove("hid");
+    mb.classList.add("disabled");
+  } else {
+    sl.textContent="READY";
+    ss.textContent="Tap the microphone or the reactor to speak";
+  }
+}
+
+// Voice out
+function gV(){let v=speechSynthesis.getVoices(),ts=[x=>x.name.includes("Daniel")&&x.lang.startsWith("en"),x=>x.name.includes("UK English Male"),x=>x.lang==="en-GB"&&x.name.toLowerCase().includes("male"),x=>x.lang==="en-GB",x=>x.lang.startsWith("en")];for(let t of ts){let f=v.find(t);if(f)return f}return v[0]||null}
+function speak(text,cb){
+  if(!window.speechSynthesis||!VC){cb?.();return}
+  speechSynthesis.cancel();
+  let c=text.replace(/```[\s\S]*?```/g," ").replace(/\*\*(.*?)\*\*/g,"$1").replace(/#{1,4}\s/g,"").replace(/\n{2,}/g,". ").replace(/\n/g," ").trim();
+  if(!c){cb?.();return}
+  let u=new SpeechSynthesisUtterance(c);
+  let v=gV();if(v)u.voice=v;
+  u.lang="en-GB";u.rate=1;u.pitch=.95;
+  SPK_U=u;
+  setReactorState("speaking");
+  u.onend=()=>{SPK_U=null;setReactorState("idle");cb?.()};
+  u.onerror=u.onend;
+  speechSynthesis.speak(u);
+}
+
+// Voice in
+function startListen(){
+  let SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR||ST==="processing"||ST==="speaking")return;
+  REC=new SR();REC.lang="en-GB";REC.interimResults=true;REC.continuous=false;
+  REC.onstart=()=>setReactorState("listening");
+  REC.onresult=e=>{
+    let t=Array.from(e.results).map(r=>r[0].transcript).join("");
+    document.getElementById("stxt2").textContent='"'+t+'"';
+  };
+  REC.onend=()=>{
+    let t=document.getElementById("stxt2").textContent.replace(/^"|"$/g,"").trim();
+    if(t&&t!=="..."&&ST==="listening") sendMsg(t);
+    else setReactorState("idle");
+  };
+  REC.onerror=()=>setReactorState("idle");
+  document.getElementById("stxt2").textContent='"..."';
+  REC.start();
+}
+function stopListen(){if(REC)REC.stop()}
+
+// Send message to Jarvis
+async function sendMsg(text){
+  setReactorState("processing");
+  document.getElementById("stxt2").textContent="";
+  document.getElementById("resp").innerHTML="";
+  try{
+    let r=await fetch(U+"/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:text})});
+    let d=await r.json();
+    let reply=d.reply||"I didn't quite catch that, sir.";
+    document.getElementById("resp").innerHTML="<p>"+reply.replace(/</g,"&lt;").replace(/\n/g,"<br>")+"</p>";
+    document.getElementById("stxt2").textContent="";
+    speak(reply,()=>{
+      // Hands-free: auto-listen after speaking
+      if(HF) setTimeout(()=>startListen(),600);
+    });
+  }catch(e){
+    setReactorState("idle");
+    document.getElementById("resp").innerHTML="<p style='color:#ff6b6b'>Connection error. Check server status.</p>";
+  }
+}
+
+// Controls
+function tapReactor(){
+  if(ST==="idle") startListen();
+  else if(ST==="listening") stopListen();
+  else if(ST==="speaking") stopAll();
+}
+function tapMic(){
+  if(ST==="idle") startListen();
+  else if(ST==="listening") stopListen();
+}
+function stopAll(){
+  if(window.speechSynthesis)speechSynthesis.cancel();
+  if(REC)REC.abort();
+  SPK_U=null;REC=null;
+  setReactorState("idle");
+}
+function tglTxt(){document.getElementById("txtwrap").classList.toggle("hid")}
+function sendTxt(){
+  let t=document.getElementById("tinp").value.trim();
+  if(!t||ST==="processing")return;
+  document.getElementById("tinp").value="";
+  sendMsg(t);
+}
+
+// Settings
+function tglS(){document.getElementById("sov").classList.toggle("hid")}
+function tglV(){
+  VC=!VC;
+  document.getElementById("vlb").textContent=VC?"Jarvis will speak":"Silent mode";
+  let t=document.getElementById("vtk");t.className="tk "+(VC?"on":"off");
+  document.getElementById("vtb").className="vtgl"+(VC?" on":"");
+}
+function tglHF(){
+  HF=!HF;
+  document.getElementById("hflb").textContent=HF?"Auto-listen after response":"Manual mic only";
+  let t=document.getElementById("hftk");t.className="tk "+(HF?"on":"off");
+  document.getElementById("hfb").className="vtgl"+(HF?" on":"");
+}
+</script>
+</body>
+</html>
