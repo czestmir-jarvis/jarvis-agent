@@ -158,7 +158,7 @@ body{background:#060a10;color:#b0e0ff;font-family:'Outfit',sans-serif;height:100
   <div class="slbl">Hands-Free Mode</div>
   <button class="vtgl on" id="hfb" onclick="tglHF()"><span id="hflb">Auto-listen after response</span><div class="tk on" id="hftk"><div class="tm"></div></div></button>
   <div class="slbl" style="margin-top:8px">About</div>
-  <div style="font-size:13px;color:rgba(0,180,255,0.3);line-height:1.6">Jarvis v2 — Powered by Claude. Tap the reactor or mic to speak. Jarvis remembers your conversations.</div>
+  <div style="font-size:13px;color:rgba(0,180,255,0.3);line-height:1.6">Jarvis v2 â€” Powered by Claude. Tap the reactor or mic to speak. Jarvis remembers your conversations.</div>
 </div></div>
 
 <script>
@@ -166,9 +166,31 @@ body{background:#060a10;color:#b0e0ff;font-family:'Outfit',sans-serif;height:100
 let U=location.origin, VC=true, HF=true, ST="idle"; // idle|listening|processing|speaking
 let REC=null, SPK_U=null;
 
+// iOS speech unlock â€” must speak once during a user gesture
+let speechUnlocked=false;
+function unlockSpeech(){
+  if(speechUnlocked||!window.speechSynthesis)return;
+  let u=new SpeechSynthesisUtterance("");
+  u.volume=0;
+  speechSynthesis.speak(u);
+  speechUnlocked=true;
+}
+// iOS pauses long utterances â€” this keeps it alive
+let keepAliveTimer=null;
+function startKeepAlive(){
+  stopKeepAlive();
+  keepAliveTimer=setInterval(()=>{
+    if(window.speechSynthesis&&speechSynthesis.speaking){speechSynthesis.pause();speechSynthesis.resume()}
+  },5000);
+}
+function stopKeepAlive(){if(keepAliveTimer){clearInterval(keepAliveTimer);keepAliveTimer=null}}
+
 // Init
 document.addEventListener("DOMContentLoaded",()=>{
   if(window.speechSynthesis){speechSynthesis.getVoices();speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices()}
+  // Unlock speech on any first tap
+  document.addEventListener("click",unlockSpeech,{once:true});
+  document.addEventListener("touchstart",unlockSpeech,{once:true});
   setGreet();
   cH();
 });
@@ -280,16 +302,33 @@ function gV(){let v=speechSynthesis.getVoices(),ts=[x=>x.name.includes("Daniel")
 function speak(text,cb){
   if(!window.speechSynthesis||!VC){cb?.();return}
   speechSynthesis.cancel();
+  stopKeepAlive();
   let c=text.replace(/```[\s\S]*?```/g," ").replace(/\*\*(.*?)\*\*/g,"$1").replace(/#{1,4}\s/g,"").replace(/\n{2,}/g,". ").replace(/\n/g," ").trim();
   if(!c){cb?.();return}
-  let u=new SpeechSynthesisUtterance(c);
-  let v=gV();if(v)u.voice=v;
-  u.lang="en-GB";u.rate=1;u.pitch=.95;
-  SPK_U=u;
-  setReactorState("speaking");
-  u.onend=()=>{SPK_U=null;setReactorState("idle");cb?.()};
-  u.onerror=u.onend;
-  speechSynthesis.speak(u);
+  // Split long text into chunks for iOS (max ~200 chars each)
+  let chunks=[];
+  let sentences=c.split(/(?<=[.!?])\s+/);
+  let current="";
+  for(let s of sentences){
+    if((current+" "+s).length>180&&current){chunks.push(current.trim());current=s}
+    else current+=(current?" ":"")+s;
+  }
+  if(current)chunks.push(current.trim());
+  
+  let i=0;
+  function speakNext(){
+    if(i>=chunks.length){stopKeepAlive();SPK_U=null;setReactorState("idle");cb?.();return}
+    let u=new SpeechSynthesisUtterance(chunks[i]);
+    let v=gV();if(v)u.voice=v;
+    u.lang="en-GB";u.rate=1;u.pitch=.95;
+    SPK_U=u;
+    setReactorState("speaking");
+    startKeepAlive();
+    u.onend=()=>{i++;speakNext()};
+    u.onerror=()=>{i++;speakNext()};
+    speechSynthesis.speak(u);
+  }
+  speakNext();
 }
 
 // Voice in
@@ -346,6 +385,7 @@ function tapMic(){
 }
 function stopAll(){
   if(window.speechSynthesis)speechSynthesis.cancel();
+  stopKeepAlive();
   if(REC)REC.abort();
   SPK_U=null;REC=null;
   setReactorState("idle");
